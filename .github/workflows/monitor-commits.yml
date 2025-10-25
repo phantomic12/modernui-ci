@@ -1,0 +1,83 @@
+name: Monitor Jellyfin ModernUI Commits
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  check-commits:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Fetch full history to ensure we can work with commit.txt
+        fetch-depth: 0
+
+    - name: Get latest commit from target repository
+      id: get-latest-commit
+      run: |
+        # Get the latest commit SHA from the target repository
+        LATEST_COMMIT=$(curl -s "https://api.github.com/repos/akhilmulpurii/jellyfin-androidtv-modernui/commits" | jq -r '.[0].sha')
+        echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+        echo "Latest commit from target repo: $LATEST_COMMIT"
+
+    - name: Check if commit.txt exists
+      id: check-commit-file
+      run: |
+        if [ -f commit.txt ]; then
+          CURRENT_COMMIT=$(cat commit.txt)
+          echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          echo "commit_file_exists=true" >> $GITHUB_OUTPUT
+          echo "Current commit in commit.txt: $CURRENT_COMMIT"
+        else
+          echo "commit_file_exists=false" >> $GITHUB_OUTPUT
+          echo "commit.txt does not exist"
+        fi
+
+    - name: Compare commits
+      id: compare-commits
+      run: |
+        LATEST_COMMIT="${{ steps.get-latest-commit.outputs.latest_commit }}"
+        CURRENT_COMMIT="${{ steps.check-commit-file.outputs.current_commit }}"
+        FILE_EXISTS="${{ steps.check-commit-file.outputs.commit_file_exists }}"
+
+        if [ "$FILE_EXISTS" = "false" ] || [ "$LATEST_COMMIT" != "$CURRENT_COMMIT" ]; then
+          echo "commits_different=true" >> $GITHUB_OUTPUT
+          echo "Triggering build workflow - commits are different or file doesn't exist"
+          echo "Latest: $LATEST_COMMIT"
+          echo "Current: $CURRENT_COMMIT"
+        else
+          echo "commits_different=false" >> $GITHUB_OUTPUT
+          echo "No changes detected - commits are the same"
+        fi
+
+    - name: Update commit.txt
+      if: steps.compare-commits.outputs.commits_different == 'true'
+      run: |
+        echo "${{ steps.get-latest-commit.outputs.latest_commit }}" > commit.txt
+        echo "Updated commit.txt with latest commit"
+
+    - name: Commit and push changes
+      if: steps.compare-commits.outputs.commits_different == 'true'
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add commit.txt
+        git commit -m "Update commit.txt with latest commit from jellyfin-androidtv-modernui"
+        git push
+
+    - name: Trigger build workflow
+      if: steps.compare-commits.outputs.commits_different == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'build-apk.yml',
+            ref: 'main'
+          })

@@ -1,0 +1,125 @@
+name: Build Jellyfin ModernUI APK
+
+on:
+  workflow_dispatch: # Triggered by monitor workflow
+  workflow_call: # Allow calling from other workflows
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Get latest commit info
+      id: commit-info
+      run: |
+        # Get the latest commit SHA from the target repository for release naming
+        LATEST_COMMIT=$(curl -s "https://api.github.com/repos/akhilmulpurii/jellyfin-androidtv-modernui/commits" | jq -r '.[0].sha')
+        SHORT_COMMIT=$(echo $LATEST_COMMIT | cut -c1-8)
+
+        # Get commit date for release naming
+        COMMIT_DATE=$(curl -s "https://api.github.com/repos/akhilmulpurii/jellyfin-androidtv-modernui/commits/$LATEST_COMMIT" | jq -r '.commit.committer.date' | cut -d'T' -f1)
+
+        # Get commit message for release notes
+        COMMIT_MESSAGE=$(curl -s "https://api.github.com/repos/akhilmulpurii/jellyfin-androidtv-modernui/commits/$LATEST_COMMIT" | jq -r '.commit.message' | head -1)
+
+        echo "commit_sha=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+        echo "short_commit=$SHORT_COMMIT" >> $GITHUB_OUTPUT
+        echo "commit_date=$COMMIT_DATE" >> $GITHUB_OUTPUT
+        echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+
+    - name: Checkout target repository
+      uses: actions/checkout@v4
+      with:
+        repository: akhilmulpurii/jellyfin-androidtv-modernui
+        ref: ${{ steps.commit-info.outputs.commit_sha }}
+        path: jellyfin-source
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          jellyfin-source/.gradle
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties', '**/build.gradle.kts') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x jellyfin-source/gradlew
+      working-directory: jellyfin-source
+
+    - name: Build debug APK
+      run: ./gradlew assembleDebug
+      working-directory: jellyfin-source
+
+    - name: Find APK file
+      id: find-apk
+      run: |
+        APK_PATH=$(find jellyfin-source -name "*.apk" -type f | head -1)
+        if [ -z "$APK_PATH" ]; then
+          echo "No APK file found!"
+          exit 1
+        fi
+        echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+        echo "Found APK: $APK_PATH"
+
+    - name: Generate release notes
+      id: release-notes
+      run: |
+        SHORT_COMMIT="${{ steps.commit-info.outputs.short_commit }}"
+        COMMIT_DATE="${{ steps.commit-info.outputs.commit_date }}"
+        COMMIT_MESSAGE="${{ steps.commit-info.outputs.commit_message }}"
+
+        RELEASE_NOTES="## Jellyfin Android TV ModernUI - Build $COMMIT_DATE
+
+**Commit:** \`$SHORT_COMMIT\`
+**Date:** $COMMIT_DATE
+
+### Changes
+$COMMIT_MESSAGE
+
+### Installation
+Download the APK file and install it on your Android TV device.
+
+### Requirements
+- Android TV device
+- Jellyfin server (10.8.0+ recommended)
+
+### Notes
+This is an automated build from the latest commit in the [jellyfin-androidtv-modernui](https://github.com/akhilmulpurii/jellyfin-androidtv-modernui) repository."
+
+        echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create release
+      id: create-release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: build-${{ steps.commit-info.outputs.commit_date }}-${{ steps.commit-info.outputs.short_commit }}
+        release_name: Jellyfin ModernUI Build ${{ steps.commit-info.outputs.commit_date }}
+        body: ${{ steps.release-notes.outputs.release_notes }}
+        draft: false
+        prerelease: false
+
+    - name: Upload APK to release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: ${{ steps.find-apk.outputs.apk_path }}
+        asset_name: jellyfin-androidtv-modernui-debug.apk
+        asset_content_type: application/vnd.android.package-archive

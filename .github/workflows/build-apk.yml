@@ -82,7 +82,7 @@ jobs:
 
         RELEASE_NOTES="## Jellyfin Android TV ModernUI - Build $COMMIT_DATE
 
-**Commit:** \`$SHORT_COMMIT\`
+**Commit:** $SHORT_COMMIT
 **Date:** $COMMIT_DATE
 
 ### Changes

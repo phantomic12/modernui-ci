@@ -6,6 +6,10 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch: # Allow manual triggering
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   check-commits:
     runs-on: ubuntu-latest
@@ -16,6 +20,7 @@ jobs:
       with:
         # Fetch full history to ensure we can work with commit.txt
         fetch-depth: 0
+        token: ${{ secrets.GH_TOKEN }}
 
     - name: Get latest commit from target repository
       id: get-latest-commit

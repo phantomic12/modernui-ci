@@ -82,21 +82,21 @@ jobs:
 
         RELEASE_NOTES="## Jellyfin Android TV ModernUI - Build $COMMIT_DATE
 
-**Commit:** $SHORT_COMMIT
-**Date:** $COMMIT_DATE
+        **Commit:** $SHORT_COMMIT
+        **Date:** $COMMIT_DATE
 
-### Changes
-$COMMIT_MESSAGE
+        ### Changes
+        $COMMIT_MESSAGE
 
-### Installation
-Download the APK file and install it on your Android TV device.
+        ### Installation
+        Download the APK file and install it on your Android TV device.
 
-### Requirements
-- Android TV device
-- Jellyfin server (10.8.0+ recommended)
+        ### Requirements
+        - Android TV device
+        - Jellyfin server (10.8.0+ recommended)
 
-### Notes
-This is an automated build from the latest commit in the [jellyfin-androidtv-modernui](https://github.com/akhilmulpurii/jellyfin-androidtv-modernui) repository."
+        ### Notes
+        This is an automated build from the latest commit in the [jellyfin-androidtv-modernui](https://github.com/akhilmulpurii/jellyfin-androidtv-modernui) repository."
 
         echo "release_notes<<EOF" >> $GITHUB_OUTPUT
         echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT

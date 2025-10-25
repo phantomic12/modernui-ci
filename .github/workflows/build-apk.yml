@@ -106,7 +106,7 @@ jobs:
       id: create-release
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       with:
         tag_name: build-${{ steps.commit-info.outputs.commit_date }}-${{ steps.commit-info.outputs.short_commit }}
         release_name: Jellyfin ModernUI Build ${{ steps.commit-info.outputs.commit_date }}
@@ -117,7 +117,7 @@ jobs:
     - name: Upload APK to release
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       with:
         upload_url: ${{ steps.create-release.outputs.upload_url }}
         asset_path: ${{ steps.find-apk.outputs.apk_path }}

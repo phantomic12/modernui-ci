@@ -28,7 +28,7 @@ jobs:
         echo "commit_message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
 
     - name: Checkout target repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         repository: akhilmulpurii/jellyfin-androidtv-modernui
         ref: ${{ steps.commit-info.outputs.commit_sha }}
